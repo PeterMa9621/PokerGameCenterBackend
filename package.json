@@ -1,0 +1,29 @@
+{
+  "name": "pokergamecenter",
+  "version": "1.0.0",
+  "description": "A Poker Game Center",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeterMa9621/PokerGameCenterBackend.git"
+  },
+  "keywords": [
+    "Poker"
+  ],
+  "author": "JingyuanMa,YifeiBai",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PeterMa9621/PokerGameCenterBackend/issues"
+  },
+  "homepage": "https://github.com/PeterMa9621/PokerGameCenterBackend#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "express-ws": "^4.0.0",
+    "ws": "^7.3.1"
+  },
+  "devDependencies": {}
+}
