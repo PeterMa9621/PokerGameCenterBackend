@@ -11,6 +11,7 @@ class Room {
     constructor(id) {
         this.id = id;
         this.players = {};
+        this.orderedPlayers = [];
         this.types = [PokerType.CLUB, PokerType.DIAMOND, PokerType.HEART, PokerType.SPADE];
         this.initPokerBoard();
     }
@@ -48,6 +49,7 @@ class Room {
         if(this.players.length > 4)
             return;
         this.players[player.userName] = player;
+        this.orderedPlayers.push(player);
         this.sendAllPlayerData();
     }
 
@@ -57,14 +59,20 @@ class Room {
 
     removePlayer(userName) {
         delete this.players[userName];
-
+        for(let i=0; i<this.orderedPlayers.length; i++) {
+            let player = this.orderedPlayers[i];
+            if(player.userName === userName) {
+                this.orderedPlayers.splice(i, 1);
+            }
+        }
         this.sendAllPlayerData();
     }
 
     sendAllPlayerData() {
         this.sendMessageToAllPlayers(JSON.stringify({
             action: Bie7ActionType.JOIN,
-            players: this.serializePlayers()
+            players: this.serializePlayers(),
+            orderedPlayers: this.serializeOrderedPlayers()
         }));
     }
 
@@ -83,6 +91,14 @@ class Room {
         return players;
     }
 
+    serializeOrderedPlayers() {
+        let players = [];
+        for(let player of this.orderedPlayers) {
+            players.push(player.serialize());
+        }
+        return players;
+    }
+
     dealRandomPoker() {
         let players = this.players;
         let numPlayer = Object.keys(players).length;
@@ -92,6 +108,9 @@ class Room {
         let randomPokers = this.dealCards();
         let index = 0;
         for(let userName in players) {
+            if(randomPokers[index][0] === 'S7') {
+                players[userName].setMyTurn(true);
+            }
             let pokerList = PokerUtility.convertPokerCodesToPokerList(randomPokers[index]);
             players[userName].setCurrentPokers(pokerList);
             index ++;

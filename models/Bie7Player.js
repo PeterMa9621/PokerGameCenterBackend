@@ -6,6 +6,7 @@ class Bie7Player {
         this.currentPokers = currentPokers;
         this.webSocket = webSocket;
         this.isPrepared = false;
+        this.myTurn = false;
     }
 
     setCurrentPokers(pokers) {
@@ -20,12 +21,17 @@ class Bie7Player {
         this.isPrepared = isPrepared;
     }
 
+    setMyTurn(isMyTurn) {
+        this.myTurn = isMyTurn;
+    }
+
     serialize() {
         return {
             userName: this.userName,
             score: this.score,
             winRate: this.winRate,
-            isPrepared: this.isPrepared
+            isPrepared: this.isPrepared,
+            myTurn: this.myTurn
         }
     }
 }
