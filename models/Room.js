@@ -1,5 +1,5 @@
 const Bie7ActionType = require("../common/Bie7ActionType");
-const Bie7Container = require("../common/Bie7Container");
+const PokerType = require("../common/PokerType");
 const PokerUtility = require("../common/PokerUtility");
 
 const cardC = ['C1','C2','C3','C4','C5','C6','C7','C8','C9','C10','C11','C12','C13'];
@@ -11,7 +11,15 @@ class Room {
     constructor(id) {
         this.id = id;
         this.players = {};
+        this.types = [PokerType.CLUB, PokerType.DIAMOND, PokerType.HEART, PokerType.SPADE];
+        this.initPokerBoard();
+    }
+
+    initPokerBoard() {
         this.currentPokerBoard = {};
+        for(let type of this.types) {
+            this.currentPokerBoard[type] = [];
+        }
     }
 
     canStartGame() {
@@ -124,6 +132,99 @@ class Room {
             newArr.push(arr.splice(i, 1)[0]);
         }
         return newArr;
+    }
+
+    checkValid(card){
+        switch (card.pokerType) {
+            case PokerType.CLUB:
+                var result = this.isValid(card.number,'C',this.currentPokerBoard[PokerType.CLUB]);
+                if(result[0]){
+
+                    this.currentPokerBoard[PokerType.CLUB].push(result[1]);
+                }else{
+                    return false
+                }
+                break;
+
+            case PokerType.DIAMOND:
+                var result = this.isValid(card.number,'D',this.currentPokerBoard[PokerType.DIAMOND]);
+                if(result[0]){
+
+                    this.currentPokerBoard[PokerType.DIAMOND].push(result[1]);
+                }else{
+                    return false
+                }
+                break;
+
+            case PokerType.HEART:
+                var result = this.isValid(card.number,'H',this.currentPokerBoard[PokerType.HEART]);
+                if(result[0]){
+                    this.currentPokerBoard[PokerType.HEART].push(result[1]);
+                }else{
+                    return false
+                }
+                break;
+
+            case PokerType.SPADE:
+                var result = this.isValid(card.number,'S',this.currentPokerBoard[PokerType.SPADE]);
+                if(result[0]){
+                    console.log(result[1]);
+                    this.currentPokerBoard[PokerType.SPADE].push(result[1]);
+                }else{
+                    return false
+                }
+                break;
+            default:
+                console.log("999");
+                return false;
+        }
+
+        this.sendMessageToAllPlayers(JSON.stringify({
+            action: 'play card',
+            poker: {...card}
+        }));
+
+        return true;
+    }
+
+    isValid(num, type, cardArr){
+
+        if((7 < num)&&(num < 14)){
+            //console.log("7 13");
+            let small = num - 1;
+            let cardCode = type + small;
+
+            if (cardArr.indexOf(cardCode) !== -1){
+                return [true, type + num];
+            }else{
+                return [false];
+            }
+
+        }else if(num < 7){
+
+            let big = num + 1;
+            let cardCode = type + big;
+
+            console.log(cardCode);
+            if (cardArr.indexOf(cardCode) !== -1){
+                return [true, type + num];
+            }else{
+                return [false];
+            }
+        }else if (num === 7){
+            if ((this.currentPokerBoard[PokerType.SPADE].length === 0) && (type !== 'S')){
+                return [false];
+            }
+            let cardCode = type + num;
+            return [true, cardCode];
+
+        }else{
+            return [false];
+        }
+    }
+
+    clear() {
+        this.initPokerBoard();
     }
 }
 

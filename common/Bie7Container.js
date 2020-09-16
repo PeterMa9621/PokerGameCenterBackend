@@ -11,7 +11,6 @@ class Bie7Container {
         let data = {};
         for(let roomId in this.Bie7Rooms) {
             let room = this.Bie7Rooms[roomId];
-            console.log(room);
             data[roomId] = {
                 numPlayers: Object.keys(room.players).length
             }

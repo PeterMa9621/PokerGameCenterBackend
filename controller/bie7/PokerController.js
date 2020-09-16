@@ -25,6 +25,7 @@ class PokerController {
         let action = data['action'];
         let roomId = data['roomId'];
         let userName = data['userName'];
+        let card = data['poker'];
         let room = Bie7Container.getRoom(roomId);
         switch (action) {
             case Bie7ActionType.JOIN:
@@ -40,7 +41,19 @@ class PokerController {
                 room.getPlayer(userName).setPrepareStatus(false);
                 room.sendAllPlayerData();
                 break;
+            case Bie7ActionType.PLAY_CARD:
+                if (! room.checkValid(card)){
+                    room.sendMessageToAllPlayers('{"error":false}');
+                }
         }
+    }
+
+    static clearBoard(roomId){
+        let room = Bie7Container.getRoom(roomId);
+        room.clear();
+        room.sendMessageToAllPlayers(JSON.stringify({
+            action: 'clear',
+        }));
     }
 }
 

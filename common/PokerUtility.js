@@ -4,7 +4,6 @@ const PokerType = require("./PokerType");
 class PokerUtility {
     static convertPokerCodesToPokerList(list) {
         let result = [];
-        console.log(list);
         for(let code of list) {
             let type = '';
             let typeCode = code.substring(0, 1);
@@ -23,7 +22,6 @@ class PokerUtility {
                     break;
             }
             let number = parseInt(code.substring(1));
-            console.log(typeCode, number);
             result.push(new Poker(type, number));
         }
         result = this.orderPoker(result);
