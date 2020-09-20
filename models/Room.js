@@ -80,6 +80,8 @@ class Room {
 
     getPlayer(userName) {
         for(let player of this.players) {
+            if(player === null)
+                continue;
             if(player.userName === userName)
                 return player;
         }
