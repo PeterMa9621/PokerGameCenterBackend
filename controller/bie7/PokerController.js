@@ -1,11 +1,18 @@
 const Bie7Container = require("../../common/Bie7Container");
 const Bie7ActionType = require("../../common/Bie7ActionType");
 const Bie7Player = require("../../models/Bie7Player");
+const MongoDatabase = require('../../database/mongodb');
 
 class PokerController {
-    static initPlayerConnection(roomId, userName, webSocket) {
+    static async initPlayerConnection(roomId, userName, webSocket) {
         let room = Bie7Container.getRoom(roomId);
-        let player = new Bie7Player(userName, 0, 0, [], webSocket);
+        let user = await MongoDatabase.getInstance().findOne({userName: userName}, 'user');
+
+        let player = new Bie7Player({
+            ...user,
+            currentPokers: [],
+            webSocket: webSocket
+        });
         room.addPlayer(player);
     }
 
@@ -25,11 +32,9 @@ class PokerController {
         let action = data['action'];
         let roomId = data['roomId'];
         let userName = data['userName'];
-        let card = data['poker'];
+        let poker = data['poker'];
         let room = Bie7Container.getRoom(roomId);
         switch (action) {
-            case Bie7ActionType.JOIN:
-                break;
             case Bie7ActionType.PREPARE:
                 room.getPlayer(userName).setPrepareStatus(true);
                 room.sendAllPlayerData();
@@ -42,9 +47,39 @@ class PokerController {
                 room.sendAllPlayerData();
                 break;
             case Bie7ActionType.PLAY_CARD:
-                if (! room.checkValid(card)){
-                    room.sendMessageToAllPlayers('{"error":false}');
+                let validResult = room.checkValid(poker);
+                if (!validResult[0]){
+                    room.getPlayer(userName).getWebSocket().send(JSON.stringify({
+                        action: 'error',
+                        msg: '您出的牌不符合规则'
+                    }));
+                } else {
+                    room.removePlayerPoker(userName, poker);
+                    room.playPoker(poker, validResult[1]);
+                    room.sendMessageToAllPlayers(JSON.stringify({
+                        action: 'play card',
+                        poker: poker,
+                        userName: userName
+                    }));
+                    if(room.canEndGame()) {
+                        room.endGame();
+                        return;
+                    }
+                    room.nextTurn();
                 }
+                break;
+            case Bie7ActionType.KOU_CARD:
+                room.kouPoker(userName, poker);
+
+                room.sendMessageToAllPlayers(JSON.stringify({
+                    action: 'kou card',
+                    userName: userName
+                }));
+                if(room.canEndGame()) {
+                    room.endGame();
+                    return;
+                }
+                room.nextTurn();
         }
     }
 

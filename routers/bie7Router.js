@@ -20,10 +20,12 @@ router.ws('/:room_id/:user_name', function(ws, req) {
     let userName = req.params['user_name'];
 
     ws.on('message', function(msg) {
+        console.log(msg);
         PokerController.doAction(msg);
     });
 
     ws.on('close', function close(e) {
+        console.log(userName + ' close');
         PokerController.removePlayerConnection(roomId, userName);
         PokerController.clearBoard(roomId);
     });

@@ -12,7 +12,7 @@ class Bie7Container {
         for(let roomId in this.Bie7Rooms) {
             let room = this.Bie7Rooms[roomId];
             data[roomId] = {
-                numPlayers: Object.keys(room.players).length
+                numPlayers: room.getNumberPlayer()
             }
         }
         return data;

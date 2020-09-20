@@ -10,9 +10,10 @@ const cardS = ['S1','S2','S3','S4','S5','S6','S7','S8','S9','S10','S11','S12','S
 class Room {
     constructor(id) {
         this.id = id;
-        this.players = {};
-        this.orderedPlayers = [];
+        this.players = [null, null, null, null];
+        this.currentPlayerIndex = 0;
         this.types = [PokerType.CLUB, PokerType.DIAMOND, PokerType.HEART, PokerType.SPADE];
+        this.isGameStart = false;
         this.initPokerBoard();
     }
 
@@ -21,98 +22,151 @@ class Room {
         for(let type of this.types) {
             this.currentPokerBoard[type] = [];
         }
+        this.isGameStart = false;
+        this.numPoker = 0;
     }
 
     canStartGame() {
-        if(Object.keys(this.players).length === 4) {
-            for(let userName in this.players) {
-                if(!this.players[userName].isPrepared)
-                    return false;
-            }
-            return true;
+        for(let player of this.players) {
+            if(player===null)
+                return false;
+            if(!player.isPrepared)
+                return false;
+        }
+        return true;
+    }
+
+    canPlayAnyPoker(player) {
+        for(let poker of player.currentPokers) {
+            if(this.checkValid(poker)[0])
+                return true;
         }
         return false;
     }
 
     startGame() {
+        this.clear();
         this.dealRandomPoker();
-        for(let userName in this.players) {
-            let player = this.players[userName];
-            player.getWebSocket().send(JSON.stringify({
-                action: 'start',
-                pokers: player.currentPokers
-            }));
-        }
+        this.isGameStart = true;
+        this.sendAllPlayerData();
+        this.sendMessageToAllPlayers(JSON.stringify({
+            action: Bie7ActionType.START,
+            currentPlayer: this.players[this.currentPlayerIndex].userName
+        }));
+    }
+
+    canEndGame() {
+        return this.numPoker === 52;
     }
 
     addPlayer(player) {
         if(this.players.length > 4)
             return;
-        this.players[player.userName] = player;
-        this.orderedPlayers.push(player);
+
+        if(!this.hasOrderedPlayer(player.userName))
+            this.players[this.players.indexOf(null)] = player;
         this.sendAllPlayerData();
     }
 
+    hasOrderedPlayer(userName) {
+        for(let player of this.players) {
+            if(player === null)
+                continue;
+            if(player.userName === userName)
+                return true;
+        }
+        return false;
+    }
+
     getPlayer(userName) {
-        return this.players[userName];
+        for(let player of this.players) {
+            if(player.userName === userName)
+                return player;
+        }
+        return null;
     }
 
     removePlayer(userName) {
-        delete this.players[userName];
-        for(let i=0; i<this.orderedPlayers.length; i++) {
-            let player = this.orderedPlayers[i];
+        for(let i=0; i<this.players.length; i++) {
+            let player = this.players[i];
+            if(player===null)
+                continue;
             if(player.userName === userName) {
-                this.orderedPlayers.splice(i, 1);
+                this.players[i] = null;
+                break;
             }
         }
         this.sendAllPlayerData();
     }
 
-    sendAllPlayerData() {
+    sendAllPlayerData(action=Bie7ActionType.UPDATE_PLAYER) {
         this.sendMessageToAllPlayers(JSON.stringify({
-            action: Bie7ActionType.JOIN,
-            players: this.serializePlayers(),
-            orderedPlayers: this.serializeOrderedPlayers()
+            action: action,
+            players: this.serializePlayers()
         }));
+        if(!this.isGameStart)
+            return;
+
+        for(let player of this.players) {
+            if(player === null)
+                continue;
+            player.getWebSocket().send(JSON.stringify({
+                action: Bie7ActionType.UPDATE_POKER,
+                poker: player.currentPokers
+            }));
+        }
     }
 
     sendMessageToAllPlayers(msg) {
-        for(let eachUserName in this.players) {
-            let player = this.players[eachUserName];
-            player.getWebSocket().send(msg);
+        for(let player of this.players) {
+            if(player!==null) {
+                if(player.getWebSocket().readyState === 1)
+                    player.getWebSocket().send(msg);
+            }
         }
     }
 
     serializePlayers() {
-        let players = {};
-        for(let userName in this.players) {
-            players[userName] = this.players[userName].serialize();
+        let players = [];
+        for(let player of this.players) {
+            if(player===null)
+                players.push(null);
+            else
+                players.push(player.serialize());
         }
         return players;
     }
 
-    serializeOrderedPlayers() {
-        let players = [];
-        for(let player of this.orderedPlayers) {
-            players.push(player.serialize());
-        }
-        return players;
+    nextTurn() {
+        let prevPlayer = this.players[this.currentPlayerIndex];
+        prevPlayer.setMyTurn(false);
+        prevPlayer.setShouldKou(false);
+        this.currentPlayerIndex += 1;
+        this.currentPlayerIndex %= 4;
+        let currentPlayer = this.players[this.currentPlayerIndex];
+        currentPlayer.setMyTurn(true);
+        if(!this.canPlayAnyPoker(currentPlayer))
+            currentPlayer.setShouldKou(true);
+        this.sendAllPlayerData();
     }
 
     dealRandomPoker() {
         let players = this.players;
-        let numPlayer = Object.keys(players).length;
+        let numPlayer = players.length;
         if(numPlayer !== 4) {
             throw "Number of player is not 4!";
         }
         let randomPokers = this.dealCards();
         let index = 0;
-        for(let userName in players) {
-            if(randomPokers[index][0] === 'S7') {
-                players[userName].setMyTurn(true);
+        for(let i=0; i<numPlayer; i++) {
+            players[i].setIsInGame(true);
+            if(randomPokers[i][0] === 'S7') {
+                console.log(players[i].userName + " has S7");
+                this.currentPlayerIndex = i;
+                players[i].setMyTurn(true);
             }
             let pokerList = PokerUtility.convertPokerCodesToPokerList(randomPokers[index]);
-            players[userName].setCurrentPokers(pokerList);
+            players[i].setCurrentPokers(pokerList);
             index ++;
         }
     }
@@ -153,57 +207,48 @@ class Room {
         return newArr;
     }
 
+    kouPoker(userName, poker) {
+        this.removePlayerPoker(userName, poker);
+        let player = this.getPlayer(userName);
+        player.numKou ++;
+        player.kouPokers.push(poker);
+    }
+
+    removePlayerPoker(userName, poker) {
+        let player = this.getPlayer(userName);
+        for(let i=0; i<Object.keys(player.currentPokers).length; i++) {
+            let currentPoker = player.currentPokers[i];
+            if(currentPoker.pokerType === poker.pokerType && currentPoker.number === poker.number) {
+                player.currentPokers.splice(i, 1);
+                break;
+            }
+        }
+        this.numPoker ++;
+    }
+
+    playPoker(poker, pokerCode) {
+        this.currentPokerBoard[poker.pokerType].push(pokerCode);
+    }
+
     checkValid(card){
+        let result;
         switch (card.pokerType) {
             case PokerType.CLUB:
-                var result = this.isValid(card.number,'C',this.currentPokerBoard[PokerType.CLUB]);
-                if(result[0]){
-
-                    this.currentPokerBoard[PokerType.CLUB].push(result[1]);
-                }else{
-                    return false
-                }
+                result = this.isValid(card.number,'C',this.currentPokerBoard[PokerType.CLUB]);
                 break;
-
             case PokerType.DIAMOND:
-                var result = this.isValid(card.number,'D',this.currentPokerBoard[PokerType.DIAMOND]);
-                if(result[0]){
-
-                    this.currentPokerBoard[PokerType.DIAMOND].push(result[1]);
-                }else{
-                    return false
-                }
+                result = this.isValid(card.number,'D',this.currentPokerBoard[PokerType.DIAMOND]);
                 break;
-
             case PokerType.HEART:
-                var result = this.isValid(card.number,'H',this.currentPokerBoard[PokerType.HEART]);
-                if(result[0]){
-                    this.currentPokerBoard[PokerType.HEART].push(result[1]);
-                }else{
-                    return false
-                }
+                result = this.isValid(card.number,'H',this.currentPokerBoard[PokerType.HEART]);
                 break;
-
             case PokerType.SPADE:
-                var result = this.isValid(card.number,'S',this.currentPokerBoard[PokerType.SPADE]);
-                if(result[0]){
-                    console.log(result[1]);
-                    this.currentPokerBoard[PokerType.SPADE].push(result[1]);
-                }else{
-                    return false
-                }
+                result = this.isValid(card.number,'S',this.currentPokerBoard[PokerType.SPADE]);
                 break;
             default:
-                console.log("999");
-                return false;
+                result = [false];
         }
-
-        this.sendMessageToAllPlayers(JSON.stringify({
-            action: 'play card',
-            poker: {...card}
-        }));
-
-        return true;
+        return result;
     }
 
     isValid(num, type, cardArr){
@@ -224,7 +269,6 @@ class Room {
             let big = num + 1;
             let cardCode = type + big;
 
-            console.log(cardCode);
             if (cardArr.indexOf(cardCode) !== -1){
                 return [true, type + num];
             }else{
@@ -242,8 +286,58 @@ class Room {
         }
     }
 
+    getNumberPlayer() {
+        let count = 0;
+        for(let player of this.players) {
+            if(player!==null)
+                count ++;
+        }
+        return count;
+    }
+
+    initPlayers() {
+        for(let player of this.players) {
+            if(player!==null)
+                player.init();
+        }
+    }
+
+    endGame() {
+        this.calculateScore();
+        for(let player of this.players) {
+            player.setIsInGame(false);
+            player.setMyTurn(false);
+            player.setPrepareStatus(false);
+            player.setShouldKou(false);
+        }
+
+        this.sendAllPlayerData();
+    }
+
+    calculateScore() {
+        let kouScore = [];
+        for(let player of this.players) {
+            kouScore.push(player.calculateKouScore());
+        }
+        console.log(kouScore);
+
+        for(let i=0; i<kouScore.length; i++) {
+            let player = this.players[i];
+            let score = 0;
+            for(let j=0; j<kouScore.length; j++) {
+                if(j === i)
+                    continue;
+                score += kouScore[j] - kouScore[i];
+            }
+            player.addScore(score);
+            player.updateDatabase();
+        }
+    }
+
     clear() {
         this.initPokerBoard();
+        this.initPlayers();
+        this.sendAllPlayerData();
     }
 }
 
